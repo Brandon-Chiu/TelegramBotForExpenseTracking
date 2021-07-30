@@ -1,6 +1,7 @@
 import os
 import telebot
 import mysql.connector
+import datetime
 
 API_KEY = os.getenv('API_KEY')
 bot = telebot.TeleBot(API_KEY)
@@ -46,13 +47,46 @@ def test1(message):
 
 @bot.message_handler(commands=['add'])
 def add(message):
-  echo_message(message)
+  is_category_present = False
   user_input = message.text.split()
-  if len(user_input) == 2:
-
+  if len(user_input) == 3:
     # code to push amount to the correct category
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_result = my_cursor.fetchall()
+    for i in my_result:
+        if i[0].lower() == user_input[2].lower():
+            is_category_present = True
+            break
+    else:
+        bot.reply_to(message, "Category selected is not present in the database! Kindly add the new category before proceeding to add new expenses.")
 
-    bot.reply_to(message, "$" + display_amount(user_input[1]) + " added to " "{TO-FILL}")
+    if is_category_present:
+        my_cursor.execute("Insert into expenses values (%s, %s, %s, %s)", (datetime.datetime.now(), float(display_amount(user_input[1])), user_input[2], message.from_user.id))
+        my_db.commit()
+        bot.reply_to(message, "$" + display_amount(user_input[1]) + " added to " + user_input[2])
+
+  else:
+    bot.reply_to(message, "Invalid input! Please try again.")
+
+@bot.message_handler(commands=['remove'])
+def add(message):
+  is_category_present = False
+  user_input = message.text.split()
+  if len(user_input) == 3:
+    # code to push amount to the correct category
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_result = my_cursor.fetchall()
+    for i in my_result:
+        if i[0].lower() == user_input[2].lower():
+            is_category_present = True
+            break
+    else:
+        bot.reply_to(message, "Category selected is not present in the database! Kindly add the new category before proceeding to add new expenses.")
+
+    if is_category_present:
+        my_cursor.execute("Insert into expenses values (%s, %s, %s, %s)", (datetime.datetime.now(), -float(display_amount(user_input[1])), user_input[2], message.from_user.id))
+        my_db.commit()
+        bot.reply_to(message, "$" + display_amount(user_input[1]) + " removed from " + user_input[2])
 
   else:
     bot.reply_to(message, "Invalid input! Please try again.")
@@ -60,7 +94,6 @@ def add(message):
 @bot.message_handler(commands=['add_category'])
 def test1(message):
     user_input = message.text.split()
-    print(user_input)
     if len(user_input) == 2:
         # make sure new category is not present
         my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
@@ -87,6 +120,104 @@ def test1(message):
     else:
         bot.reply_to(message, "Invalid input! Please try again.")
 
+@bot.message_handler(commands=['remove_category'])
+def test1(message):
+    user_input = message.text.split()
+    if len(user_input) == 2:
+        my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+        my_result = my_cursor.fetchall()
+        my_cursor.execute("Delete From categories Where userId = (%s) And category = (%s)", (message.from_user.id, user_input[1]))
+        my_db.commit()
+        removed = False
+        for i in my_result:
+            for k in i:
+                if k.lower() == user_input[1].lower():
+                    removed = True
+                    break
+        if removed:
+            bot.reply_to(message, user_input[1] + " removed from category")
+
+            bot.reply_to(message, "Fetching all categories. Please wait!")
+            my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+            my_result = my_cursor.fetchall()
+            output = ""
+            for i in my_result:
+                output += i[0] + "; "
+            output = output[:-2]
+            bot.reply_to(message, "Current list of categories: " + output)
+        else:
+            bot.reply_to(message, user_input[1] + " not present in category")
+
+            bot.reply_to(message, "Fetching all categories. Please wait!")
+            my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+            my_result = my_cursor.fetchall()
+            output = ""
+            for i in my_result:
+                output += i[0] + "; "
+            output = output[:-2]
+            bot.reply_to(message, "Current list of categories: " + output)
+    else:
+        bot.reply_to(message, "Invalid input! Please try again.")
+
+
+@bot.message_handler(commands=['display_all'])
+def test1(message):
+    my_cursor.execute("Select * From expenses where userId = (%s)", (message.from_user.id,))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_amount_breakdown(my_result, my_category)
+    bot.reply_to(message, "Breakdown of total expenses: \n" + output)
+
+@bot.message_handler(commands=['display_current_week'])
+def test1(message):
+    current_day = datetime.datetime.today().weekday()
+    my_cursor.execute("Select * From expenses where userId = (%s) and time >= (%s)", (message.from_user.id, get_starting_date_for_week(current_day)))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_amount_breakdown(my_result, my_category)
+    bot.reply_to(message, "Breakdown of current week expenses: \n" + output)
+
+@bot.message_handler(commands=['display_current_month'])
+def test1(message):
+    current_date = datetime.datetime.now()
+    my_cursor.execute("Select * From expenses where userId = (%s) and time >= (%s)", (message.from_user.id, datetime.datetime(current_date.year, current_date.month, 1)))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_amount_breakdown(my_result, my_category)
+    bot.reply_to(message, "Breakdown of current month expenses: \n" + output)
+
+@bot.message_handler(commands=['display_all_log'])
+def test1(message):
+    my_cursor.execute("Select * From expenses where userId = (%s)", (message.from_user.id,))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_log(my_result, my_category)
+    bot.reply_to(message, "Expenses history: \n" + output)
+
+@bot.message_handler(commands=['display_current_month_log'])
+def test1(message):
+    current_date = datetime.datetime.now()
+    my_cursor.execute("Select * From expenses where userId = (%s) and time >= (%s)", (message.from_user.id, datetime.datetime(current_date.year, current_date.month, 1)))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_log(my_result, my_category)
+    bot.reply_to(message, "Expenses history: \n" + output)
+
+@bot.message_handler(commands=['display_current_week_log'])
+def test1(message):
+    current_day = datetime.datetime.today().weekday()
+    my_cursor.execute("Select * From expenses where userId = (%s) and time >= (%s)", (message.from_user.id, get_starting_date_for_week(current_day)))
+    my_result = my_cursor.fetchall()
+    my_cursor.execute("Select category From categories where userId = (%s)", (message.from_user.id,))
+    my_category = my_cursor.fetchall()
+    output = display_log(my_result, my_category)
+    bot.reply_to(message, "Expenses history: \n" + output)
+
 @bot.message_handler(commands=['view_category'])
 def test1(message):
     bot.reply_to(message, "Fetching all categories. Please wait!")
@@ -97,17 +228,6 @@ def test1(message):
         output += i[0] + "; "
     output= output[:-2]
     bot.reply_to(message, "Current list of categories: " + output)
-
-@bot.message_handler(func=lambda message: True)
-def echo_message(message):
-  cid = message.chat.id
-  mid = message.message_id
-  message_text = message.text
-  user_id = message.from_user.id
-  user_name = message.from_user.first_name
-  print(message_text)
-  print(user_id)
-
 
 def display_amount(amount):
     if "." not in amount:
@@ -126,5 +246,61 @@ def display_amount(amount):
         return amount + "00"
     else:
         return str(round(float(amount), 2))
+
+def caps_first_letter(word):
+    return word[0].upper() + word[1:]
+
+def get_starting_date_for_week(num):
+    current_time = datetime.datetime.today()
+    if current_time.day - num > 0:
+        return datetime.datetime(current_time.year, current_time.month, current_time.day - num)
+    elif current_time.month - 1 > 0:
+        num -= current_time.day
+        return datetime.datetime(current_time.year, current_time.month - 1, number_of_days(current_time.year, current_time.month - 1) - num)
+    else:
+        num -= current_time.day
+        return datetime.datetime(current_time.year - 1, 12, number_of_days(current_time.year - 1, 12) - num)
+
+def number_of_days(y, m):
+    leap = 0
+    if y% 400 == 0:
+        leap = 1
+    elif y % 100 == 0:
+        leap = 0
+    elif y% 4 == 0:
+        leap = 1
+    if m==2:
+        return 28 + leap
+    list = [1,3,5,7,8,10,12]
+    if m in list:
+        return 31
+    return 30
+
+def display_log(my_result, my_category):
+    result = {}
+    amount = {}
+    for i in my_category:
+        result[i[0].lower()] = "\n"
+        amount[i[0].lower()] = 0
+    for i in my_result:
+        result[i[2].lower()] += "Date: " + i[0].strftime("%d/%m/%y") + "; Category: " + i[
+            2] + "; Amount: " + display_amount(str(i[1])) + "\n"
+        amount[i[2].lower()] += i[1]
+    output = ""
+    for key, value in result.items():
+        output += "\n***" + caps_first_letter(key) + "***" + str(value) + "Total: " + display_amount(
+            str(amount[key])) + "\n"
+    return output
+
+def display_amount_breakdown(my_result, my_category):
+    result = {}
+    for i in my_category:
+        result[i[0].lower()] = 0
+    for i in my_result:
+        result[i[2].lower()] += i[1]
+    output = ""
+    for key, value in result.items():
+        output += caps_first_letter(key) + ": " + str(value) + "\n"
+    return output
 
 bot.polling()
