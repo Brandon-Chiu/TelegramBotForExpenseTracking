@@ -286,7 +286,10 @@ def display_log(my_result, my_category):
         result[i[2].lower()] += "Date: " + i[0].strftime("%d/%m/%y") + "; Category: " + i[
             2] + "; Amount: " + display_amount(str(i[1])) + "\n"
         amount[i[2].lower()] += i[1]
-    output = ""
+    total_amount = 0
+    for values in amount.values():
+        total_amount += values
+    output = "Total amount: $" + display_amount(str(total_amount)) + "\n"
     for key, value in result.items():
         output += "\n***" + caps_first_letter(key) + "***" + str(value) + "Total: " + display_amount(
             str(amount[key])) + "\n"
@@ -298,7 +301,10 @@ def display_amount_breakdown(my_result, my_category):
         result[i[0].lower()] = 0
     for i in my_result:
         result[i[2].lower()] += i[1]
-    output = ""
+    total_amount = 0
+    for values in result.values():
+        total_amount += values
+    output = "Total amount: $" + display_amount(str(total_amount)) + "\n\n"
     for key, value in result.items():
         output += caps_first_letter(key) + ": " + str(value) + "\n"
     return output
