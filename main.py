@@ -31,7 +31,7 @@ def test2(message):
 
 @bot.message_handler(commands=['start'])
 def test1(message):
-  bot.reply_to(message, "Welcome! :)")
+  bot.reply_to(message, "Welcome! :-)")
   my_cursor.execute("Select userId From users")
   my_result=my_cursor.fetchall()
 
